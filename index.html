@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8" />
+  <title>Lab 03 – My Web Map</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+  <style>
+    html, body { height:100%; margin:0 }
+    #map { position:absolute; inset:0 } /* full screen map */
+    /* Right-hover panel */
+    #panel {
+      position:absolute; top:16px; right:16px; width:420px;
+      max-height:calc(100vh - 32px); overflow:auto; background:#fff;
+      border:1px solid #ddd; border-radius:10px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,.12);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    h2 { margin:0 0 8px; font-size:18px }
+    button { margin:8px 0; padding:8px 10px; cursor:pointer }
+    table { width:100%; border-collapse:collapse; border:1px solid #ddd; font-size:14px }
+    th,td { text-align:left; padding:12px }
+    tr:nth-child(even){ background:#f6f6f6 }
+    /* Hide panel on narrow screens (<1024px) */
+    @media (max-width:1024px){ #panel { display:none } }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <aside id="panel">
+    <h2>My Dataset</h2>
+    <p>Two GeoJSON layers; table lists one of them. Click to sort by value.</p>
+    <button id="sortBtn">Sort by VALUE</button>
+    <table id="dataTable">
+      <tr><th>Name</th><th>Value</th><th>Info</th></tr>
+    </table>
+  </aside>
+
+  <script>
+    // 0) Your Mapbox token
+    mapboxgl.accessToken = 'YOUR_MAPBOX_TOKEN_HERE';
+
+    // 1) Different style than earthquake page (e.g., "light-v10")
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/light-v10',
+      center: [-122.33, 47.6], // Seattle (change if you want)
+      zoom: 10
+    });
+
+    // 2) Point these to YOUR two datasets for the deliverable
+    const DATASET_A = 'assets/my_points.geojson';    // e.g., your points
+    const DATASET_B = 'assets/my_polygons.geojson';  // e.g., your polygons
+
+    // 3) Field names you’ll show in the table (edit to match your data)
+    const NAME_FIELD  = 'name';
+    const VALUE_FIELD = 'value';
+    const INFO_FIELD  = 'info';
+
+    async function init() {
+      // Load both datasets
+      const a = await (await fetch(DATASET_A)).json();
+      const b = await (await fetch(DATASET_B)).json();
+
+      map.on('load', () => {
+        // Add polygons (B) first so points appear on top
+        map.addSource('B', { type:'geojson', data:b });
+        map.addLayer({
+          id:'B-fill', type:'fill', source:'B',
+          paint:{ 'fill-color':'#a0c4ff', 'fill-opacity':0.45 }
+        });
+        map.addLayer({
+          id:'B-outline', type:'line', source:'B',
+          paint:{ 'line-color':'#4f5d75', 'line-width':0.8 }
+        });
+
+        // Add points (A)
+        map.addSource('A', { type:'geojson', data:a });
+        map.addLayer({
+          id:'A-circles', type:'circle', source:'A',
+          paint:{
+            'circle-radius': 6,
+            'circle-color': '#ff595e',
+            'circle-stroke-color': '#222',
+            'circle-stroke-width': 1
+          }
+        });
+
+        // Build table from dataset A
+        const table = document.getElementById('dataTable');
+        for (const f of (a.features || [])) {
+          const p = f.properties || {};
+          const row = table.insertRow(-1);
+          row.insertCell(0).textContent = p[NAME_FIELD]  ?? '(no name)';
+          row.insertCell(1).textContent = p[VALUE_FIELD] ?? '';
+          row.insertCell(2).textContent = p[INFO_FIELD]  ?? '';
+        }
+
+        // Sort button (desc by VALUE)
+        document.getElementById('sortBtn').addEventListener('click', () => {
+          let switching = true;
+          while (switching) {
+            switching = false;
+            const rows = table.rows;
+            for (let i = 1; i < rows.length - 1; i++) {
+              const x = parseFloat(rows[i].cells[1].textContent) || 0;
+              const y = parseFloat(rows[i+1].cells[1].textContent) || 0;
+              if (x < y) { rows[i].parentNode.insertBefore(rows[i+1], rows[i]); switching = true; break; }
+            }
+          }
+        });
+      });
+    }
+    init();
+  </script>
+</body>
+</html>
