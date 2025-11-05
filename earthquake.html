@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8" />
+  <title>Earthquake List</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+
+  <!-- Mapbox GL JS (as in the README) -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+
+  <style>
+    /* Layout exactly like the README describes */
+    body { margin: 0; padding: 0; }
+    #container { display: flex; height: 100vh; flex-direction: row; align-items: stretch; }
+    #side-panel { flex-basis: 500px; overflow-y: scroll; padding: 16px; box-sizing: border-box; }
+    #map { flex-grow: 1; }
+
+    /* Table styles from the README */
+    button { margin-bottom: 10px; }
+    table { border-collapse: collapse; border-spacing: 0; width: 100%; border: 1px solid #ddd; }
+    th, td { text-align: left; padding: 16px; }
+    tr:nth-child(even) { background-color: #f2f2f2; }
+  </style>
+</head>
+<body>
+  <main id="container">
+    <div id="side-panel">
+      <h2>Earthquake List</h2>
+      <button id="sortBtn">Sort by Magnitude</button>
+
+      <table id="eqTable">
+        <tr>
+          <th>id</th>
+          <th>magnitude</th>
+          <th>timestamp</th>
+        </tr>
+      </table>
+    </div>
+    <div id="map"></div>
+  </main>
+
+  <script>
+    // 0) PUT YOUR MAPBOX TOKEN HERE
+    mapboxgl.accessToken = 'YOUR_MAPBOX_TOKEN_HERE';
+
+    // 1) Create the map (satellite style, centered on Japan)
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/satellite-v9',
+      zoom: 5.5,
+      center: [138, 38]
+    });
+
+    // 2) Async function to load both GeoJSON files
+    async function geojsonFetch() {
+      let response, earthquakes, japan;
+
+      response = await fetch('assets/earthquakes.geojson');
+      earthquakes = await response.json();
+
+      response = await fetch('assets/japan.json');
+      japan = await response.json();
+
+      // 3) When map is loaded, add sources + layers
+      map.on('load', function () {
+        map.addSource('earthquakes', { type: 'geojson', data: earthquakes });
+        map.addLayer({
+          id: 'earthquakes-layer',
+          type: 'circle',
+          source: 'earthquakes',
+          paint: {
+            'circle-radius': 6,
+            'circle-stroke-width': 2,
+            'circle-color': 'red',
+            'circle-stroke-color': 'white'
+          }
+        });
+
+        map.addSource('japan', { type: 'geojson', data: japan });
+        map.addLayer({
+          id: 'japan-layer',
+          type: 'fill',
+          source: 'japan',
+          paint: {
+            'fill-color': '#0080ff',
+            'fill-opacity': 0.5
+          }
+        });
+      });
+
+      // 4) Build the table from the same earthquakes data
+      const table = document.getElementById('eqTable');
+      for (let i = 0; i < earthquakes.features.length; i++) {
+        const f = earthquakes.features[i];
+        const row = table.insertRow(-1);
+        const c1 = row.insertCell(0);
+        const c2 = row.insertCell(1);
+        const c3 = row.insertCell(2);
+        c1.innerHTML = f.properties.id;
+        c2.innerHTML = f.properties.mag;
+        c3.innerHTML = new Date(f.properties.time).toLocaleDateString('en-US');
+      }
+
+      // 5) Sort button (descending by magnitude)
+      document.getElementById('sortBtn').addEventListener('click', function () {
+        let rows, switching = true;
+        while (switching) {
+          switching = false;
+          rows = table.rows;
+          for (let i = 1; i < rows.length - 1; i++) {
+            let x = parseFloat(rows[i].getElementsByTagName('td')[1].innerHTML);
+            let y = parseFloat(rows[i + 1].getElementsByTagName('td')[1].innerHTML);
+            if (x < y) {
+              rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+              switching = true;
+              break;
+            }
+          }
+        }
+      });
+    }
+
+    // Kick it off
+    geojsonFetch();
+  </script>
+</body>
+</html>
