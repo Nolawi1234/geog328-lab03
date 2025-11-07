@@ -32,7 +32,7 @@
     <p>Neighborhood polygons + library points. Click to sort by the value column.</p>
     <button id="sortBtn">Sort by VALUE</button>
     <table id="dataTable">
-      <tr><th>Name</th><th>ZIP code</th><th>Address</th></tr>
+      <tr><th>Name</th><th>Value</th><th>Info</th></tr>
     </table>
   </aside>
 
@@ -47,7 +47,7 @@
     // Try to auto-pick good fields from the libraries file:
     const NAME_CANDIDATES  = ['LABEL','NAME','BRANCH','BRANCH_NAM','Title','TITLE'];
     const VALUE_CANDIDATES = ['OBJECTID','OBJECTID_1','FID','ID','routes','count','Year','YEAR'];
-    const INFO_CANDIDATES  = ['ADDRESS','FULLADDR','FULL_ADD','ADDR','STREET','Location','NEIGHBORHOOD','ZIPCODE'];
+    const ADDRESS_CANDIDATES  = ['ADDRESS','FULLADDR','FULL_ADD','ADDR','STREET','Location','NEIGHBORHOOD','ZIPCODE'];
 
     const map = new mapboxgl.Map({
       container: 'map',
