@@ -29,76 +29,86 @@
   <div id="map"></div>
   <aside id="panel">
     <h2>Seattle Public Libraries</h2>
-    <p>Neighborhood polygons + library points. Click to sort by the value column.</p>
-    <button id="sortBtn">Sort by VALUE</button>
+    <p>Neighborhood polygons + library points.</p>
+    <button id="sortBtn">Sort by ZIP code</button>
     <table id="dataTable">
-      <tr><th>Name</th><th>Value</th><th>Info</th></tr>
+      <tr><th>Name</th><th>ZIP code</th><th>Address</th></tr>
     </table>
   </aside>
 
   <script>
-   
+    // 1) Mapbox token
     mapboxgl.accessToken = 'pk.eyJ1Ijoibm9sYXdpMjQiLCJhIjoiY21obW8yZWE5MmN2cjJscTE1am1sZnVmMiJ9.zLy0Qd4BNKLtusNXQYxWjw';
 
-   
-    const DATASET_A = 'assets/libraries.geojson'; 
-    const DATASET_B = 'assets/Neighborhood_Map_Atlas_Neighborhoods.geojson';     
+    // 2) Dataset paths (make sure these exact files exist)
+    const DATASET_LIBS = 'assets/libraries.geojson';                        // points
+    const DATASET_NEIGH = 'assets/Neighborhood_Map_Atlas_Neighborhoods.geojson'; // polygons
 
-   
-    const NAME_CANDIDATES  = ['LABEL','NAME','BRANCH','BRANCH_NAM','Title','TITLE'];
-    const VALUE_CANDIDATES = ['OBJECTID','OBJECTID_1','FID','ID','routes','count','Year','YEAR'];
-    const ADDRESS_CANDIDATES  = ['ADDRESS','FULLADDR','FULL_ADD','ADDR','STREET','Location','NEIGHBORHOOD','ZIPCODE'];
+    // 3) Fields from libraries for the table
+    const NAME_FIELD  = 'NAME';     // or 'BRANCH'
+    const VALUE_FIELD = 'ZIPCODE';
+    const INFO_FIELD  = 'ADDRESS';  // or 'FULLADDR'
 
+    // 4) Map (different style than earthquake page)
     const map = new mapboxgl.Map({
       container: 'map',
-      style: 'mapbox://styles/mapbox/light-v10', 
+      style: 'mapbox://styles/mapbox/light-v10',
       center: [-122.33, 47.6],
       zoom: 10
     });
 
-    function pickField(obj, candidates, fallback){
-      for (const k of candidates) if (k in obj) return k;
-      return fallback;
-    }
-
     async function init(){
       try{
-        const aResp = await fetch(DATASET_A);
-        if(!aResp.ok) throw new Error('Failed to load Dataset A: ' + DATASET_A);
-        const A = await aResp.json();
+        // Fetch both datasets (so we can build the table and fit bounds)
+        const [libsResp, neighResp] = await Promise.all([
+          fetch(DATASET_LIBS),
+          fetch(DATASET_NEIGH)
+        ]);
+        console.log('Fetch status:', {
+          libraries: libsResp.status,
+          neighborhoods: neighResp.status
+        });
+        if(!libsResp.ok) throw new Error('Failed to load libraries: ' + DATASET_LIBS);
+        if(!neighResp.ok) throw new Error('Failed to load neighborhoods: ' + DATASET_NEIGH);
 
-        const bResp = await fetch(DATASET_B);
-        if(!bResp.ok) throw new Error('Failed to load Dataset B: ' + DATASET_B);
-        const B = await bResp.json();
+        const [LIBS, NEIGH] = await Promise.all([libsResp.json(), neighResp.json()]);
+        console.log('Feature counts:', {
+          libraries: LIBS?.features?.length,
+          neighborhoods: NEIGH?.features?.length
+        });
 
-        // Decide table fields from first library feature
-        const sampleProps = (A.features && A.features[0] && A.features[0].properties) || {};
-        const NAME_FIELD  = pickField(sampleProps, NAME_CANDIDATES,  Object.keys(sampleProps)[0] || 'name');
-        const VALUE_FIELD = pickField(sampleProps, VALUE_CANDIDATES, 'OBJECTID'); // numeric fallback
-        const INFO_FIELD  = pickField(sampleProps, ADDRESS_CANDIDATES, Object.keys(sampleProps)[1] || 'info');
-
-
-        console.log('Using fields ->', { NAME_FIELD, VALUE_FIELD, INFO_FIELD });
-
+        // Add layers once the map is ready
         map.on('load', () => {
-         
-          map.addSource('B', { type:'geojson', data:B });
-          map.addLayer({ id:'B-fill', type:'fill', source:'B',
-            paint:{ 'fill-color':'#a0c4ff', 'fill-opacity':0.45 }});
-          map.addLayer({ id:'B-outline', type:'line', source:'B',
-            paint:{ 'line-color':'#4f5d75', 'line-width':0.8 }});
+          // Neighborhood polygons (bottom)
+          map.addSource('neighborhoods', { type:'geojson', data: NEIGH });
+          map.addLayer({
+            id:'neighborhoods-fill',
+            type:'fill',
+            source:'neighborhoods',
+            paint:{ 'fill-color':'#a0c4ff', 'fill-opacity':0.45 }
+          });
+          map.addLayer({
+            id:'neighborhoods-outline',
+            type:'line',
+            source:'neighborhoods',
+            paint:{ 'line-color':'#4f5d75', 'line-width':0.8 }
+          });
 
-         
-          map.addSource('A', { type:'geojson', data:A });
-          map.addLayer({ id:'A-circles', type:'circle', source:'A',
+          // Library points (top)
+          map.addSource('libraries', { type:'geojson', data: LIBS });
+          map.addLayer({
+            id:'libraries-circles',
+            type:'circle',
+            source:'libraries',
             paint:{
               'circle-radius': 6,
               'circle-color': '#ff595e',
               'circle-stroke-color': '#222',
               'circle-stroke-width': 1
-            }});
+            }
+          });
 
-         
+          // Fit to both datasets
           try{
             const bounds = new mapboxgl.LngLatBounds();
             const extend = (gj)=>{
@@ -111,31 +121,41 @@
                 }
               });
             };
-            extend(B); extend(A);
+            extend(NEIGH); extend(LIBS);
             if(!bounds.isEmpty()) map.fitBounds(bounds,{padding:24});
           }catch(e){ console.warn('fitBounds skipped:', e); }
         });
 
-        
+        // Build the table from libraries
         const table = document.getElementById('dataTable');
-        for(const f of (A.features||[])){
+        for (const f of (LIBS.features || [])) {
           const p = f.properties || {};
+          const name = p[NAME_FIELD] ?? '(no name)';
+          const zip  = p[VALUE_FIELD] ?? '';
+          const addr = p[INFO_FIELD]  ?? (p.FULLADDR ?? '');
           const row = table.insertRow(-1);
-          row.insertCell(0).textContent = p[NAME_FIELD]  ?? '(no name)';
-          row.insertCell(1).textContent = p[VALUE_FIELD] ?? '';
-          row.insertCell(2).textContent = p[INFO_FIELD]  ?? '';
+          row.insertCell(0).textContent = name;
+          row.insertCell(1).textContent = zip;
+          row.insertCell(2).textContent = addr;
         }
 
-       
-        document.getElementById('sortBtn').addEventListener('click', ()=>{
-          let switching = true;
-          while(switching){
+        // Sort by ZIP (numeric desc if numbers; otherwise A→Z)
+        document.getElementById('sortBtn').addEventListener('click', () => {
+          const t = table; let switching = true;
+          while (switching) {
             switching = false;
-            const rows = table.rows;
-            for(let i=1;i<rows.length-1;i++){
-              const x = parseFloat(rows[i].cells[1].textContent) || 0;
-              const y = parseFloat(rows[i+1].cells[1].textContent) || 0;
-              if(x < y){ rows[i].parentNode.insertBefore(rows[i+1], rows[i]); switching = true; break; }
+            for (let i = 1; i < t.rows.length - 1; i++) {
+              const a = t.rows[i].cells[1].textContent.trim();
+              const b = t.rows[i+1].cells[1].textContent.trim();
+              const an = parseFloat(a), bn = parseFloat(b);
+              const bothNum = !Number.isNaN(an) && !Number.isNaN(bn);
+              const shouldSwitch = bothNum ? (an < bn)
+                                           : (a.localeCompare(b, undefined, {sensitivity:'base'}) > 0);
+              if (shouldSwitch) {
+                t.rows[i].parentNode.insertBefore(t.rows[i+1], t.rows[i]);
+                switching = true;
+                break;
+              }
             }
           }
         });
