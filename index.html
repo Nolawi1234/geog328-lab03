@@ -75,7 +75,8 @@
         const sampleProps = (A.features && A.features[0] && A.features[0].properties) || {};
         const NAME_FIELD  = pickField(sampleProps, NAME_CANDIDATES,  Object.keys(sampleProps)[0] || 'name');
         const VALUE_FIELD = pickField(sampleProps, VALUE_CANDIDATES, 'OBJECTID'); // numeric fallback
-        const INFO_FIELD  = pickField(sampleProps, INFO_CANDIDATES,  Object.keys(sampleProps)[1] || 'info');
+        const INFO_FIELD  = pickField(sampleProps, ADDRESS_CANDIDATES, Object.keys(sampleProps)[1] || 'info');
+
 
         console.log('Using fields ->', { NAME_FIELD, VALUE_FIELD, INFO_FIELD });
 
