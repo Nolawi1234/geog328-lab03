@@ -37,19 +37,19 @@
   </aside>
 
   <script>
-    // 1) TOKEN
+   
     mapboxgl.accessToken = 'pk.eyJ1Ijoibm9sYXdpMjQiLCJhIjoiY21obW8yZWE5MmN2cjJscTE1am1sZnVmMiJ9.zLy0Qd4BNKLtusNXQYxWjw';
 
-    // 2) DATASETS (must exist at these exact paths)
-    const DATASET_LIBS  = 'assets/libraries.geojson';                        // points
-    const DATASET_NEIGH = 'assets/Neighborhood_Map_Atlas_Neighborhoods.geojson'; // polygons
+   
+    const DATASET_LIBS  = 'assets/libraries.geojson';                        
+    const DATASET_NEIGH = 'assets/Neighborhood_Map_Atlas_Neighborhoods.geojson'; 
 
-    // 3) TABLE FIELDS (lock them to your file’s keys)
-    const NAME_FIELD  = 'NAME';     // or 'BRANCH'
+    
+    const NAME_FIELD  = 'NAME';    
     const VALUE_FIELD = 'ZIPCODE';
-    const INFO_FIELD  = 'ADDRESS';  // or 'FULLADDR'
+    const INFO_FIELD  = 'ADDRESS';  
 
-    // 4) MAP (different style than earthquake page)
+    
     const map = new mapboxgl.Map({
       container: 'map',
       style: 'mapbox://styles/mapbox/light-v10',
@@ -59,7 +59,7 @@
 
     async function init(){
       try{
-        // fetch both (and log status so we can see 404s fast)
+        
         const [libsResp, neighResp] = await Promise.all([
           fetch(DATASET_LIBS),
           fetch(DATASET_NEIGH)
@@ -70,7 +70,7 @@
         const [LIBS, NEIGH] = await Promise.all([libsResp.json(), neighResp.json()]);
 
         map.on('load', () => {
-          // neighborhoods (bottom)
+         
           map.addSource('neighborhoods', { type:'geojson', data: NEIGH });
           map.addLayer({
             id:'neighborhoods-fill',
@@ -85,7 +85,7 @@
             paint:{ 'line-color':'#4f5d75', 'line-width':0.8 }
           });
 
-          // libraries (top)
+         
           map.addSource('libraries', { type:'geojson', data: LIBS });
           map.addLayer({
             id:'libraries-circles',
@@ -99,7 +99,7 @@
             }
           });
 
-          // fit to both
+         
           try{
             const bounds = new mapboxgl.LngLatBounds();
             const extend = (gj)=>{
@@ -117,7 +117,7 @@
           }catch(e){ console.warn('fitBounds skipped:', e); }
         });
 
-        // table from libraries
+       
         const table = document.getElementById('dataTable');
         for (const f of (LIBS.features || [])) {
           const p = f.properties || {};
@@ -127,7 +127,7 @@
           row.insertCell(2).textContent = p[INFO_FIELD]  ?? (p.FULLADDR ?? '');
         }
 
-        // sort ZIP (numeric desc if numbers; otherwise A→Z)
+       
         document.getElementById('sortBtn').addEventListener('click', () => {
           const t = table; let switching = true;
           while (switching) {
