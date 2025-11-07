@@ -31,26 +31,25 @@
     <h2>Seattle Public Libraries</h2>
     <p>Neighborhood polygons + library points.</p>
     <button id="sortBtn">Sort by ZIP code</button>
-<table id="dataTable">
-  <tr><th>Name</th><th>ZIP code</th><th>Address</th></tr>
-</table>
-
+    <table id="dataTable">
+      <tr><th>Name</th><th>ZIP code</th><th>Address</th></tr>
+    </table>
   </aside>
 
   <script>
-    // 1) Mapbox token
+    // 1) TOKEN
     mapboxgl.accessToken = 'pk.eyJ1Ijoibm9sYXdpMjQiLCJhIjoiY21obW8yZWE5MmN2cjJscTE1am1sZnVmMiJ9.zLy0Qd4BNKLtusNXQYxWjw';
 
-    // 2) Dataset paths (make sure these exact files exist)
-    const DATASET_LIBS = 'assets/libraries.geojson';                        // points
+    // 2) DATASETS (must exist at these exact paths)
+    const DATASET_LIBS  = 'assets/libraries.geojson';                        // points
     const DATASET_NEIGH = 'assets/Neighborhood_Map_Atlas_Neighborhoods.geojson'; // polygons
 
-    // 3) Fields from libraries for the table
+    // 3) TABLE FIELDS (lock them to your file’s keys)
     const NAME_FIELD  = 'NAME';     // or 'BRANCH'
     const VALUE_FIELD = 'ZIPCODE';
     const INFO_FIELD  = 'ADDRESS';  // or 'FULLADDR'
 
-    // 4) Map (different style than earthquake page)
+    // 4) MAP (different style than earthquake page)
     const map = new mapboxgl.Map({
       container: 'map',
       style: 'mapbox://styles/mapbox/light-v10',
@@ -60,27 +59,18 @@
 
     async function init(){
       try{
-        // Fetch both datasets (so we can build the table and fit bounds)
+        // fetch both (and log status so we can see 404s fast)
         const [libsResp, neighResp] = await Promise.all([
           fetch(DATASET_LIBS),
           fetch(DATASET_NEIGH)
         ]);
-        console.log('Fetch status:', {
-          libraries: libsResp.status,
-          neighborhoods: neighResp.status
-        });
         if(!libsResp.ok) throw new Error('Failed to load libraries: ' + DATASET_LIBS);
         if(!neighResp.ok) throw new Error('Failed to load neighborhoods: ' + DATASET_NEIGH);
 
         const [LIBS, NEIGH] = await Promise.all([libsResp.json(), neighResp.json()]);
-        console.log('Feature counts:', {
-          libraries: LIBS?.features?.length,
-          neighborhoods: NEIGH?.features?.length
-        });
 
-        // Add layers once the map is ready
         map.on('load', () => {
-          // Neighborhood polygons (bottom)
+          // neighborhoods (bottom)
           map.addSource('neighborhoods', { type:'geojson', data: NEIGH });
           map.addLayer({
             id:'neighborhoods-fill',
@@ -95,7 +85,7 @@
             paint:{ 'line-color':'#4f5d75', 'line-width':0.8 }
           });
 
-          // Library points (top)
+          // libraries (top)
           map.addSource('libraries', { type:'geojson', data: LIBS });
           map.addLayer({
             id:'libraries-circles',
@@ -109,7 +99,7 @@
             }
           });
 
-          // Fit to both datasets
+          // fit to both
           try{
             const bounds = new mapboxgl.LngLatBounds();
             const extend = (gj)=>{
@@ -127,20 +117,17 @@
           }catch(e){ console.warn('fitBounds skipped:', e); }
         });
 
-        // Build the table from libraries
+        // table from libraries
         const table = document.getElementById('dataTable');
         for (const f of (LIBS.features || [])) {
           const p = f.properties || {};
-          const name = p[NAME_FIELD] ?? '(no name)';
-          const zip  = p[VALUE_FIELD] ?? '';
-          const addr = p[INFO_FIELD]  ?? (p.FULLADDR ?? '');
           const row = table.insertRow(-1);
-          row.insertCell(0).textContent = name;
-          row.insertCell(1).textContent = zip;
-          row.insertCell(2).textContent = addr;
+          row.insertCell(0).textContent = p[NAME_FIELD]  ?? '(no name)';
+          row.insertCell(1).textContent = p[VALUE_FIELD] ?? '';
+          row.insertCell(2).textContent = p[INFO_FIELD]  ?? (p.FULLADDR ?? '');
         }
 
-        // Sort by ZIP (numeric desc if numbers; otherwise A→Z)
+        // sort ZIP (numeric desc if numbers; otherwise A→Z)
         document.getElementById('sortBtn').addEventListener('click', () => {
           const t = table; let switching = true;
           while (switching) {
